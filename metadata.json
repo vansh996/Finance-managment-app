@@ -1,0 +1,7 @@
+{
+  "name": "WealthFlow Tracker",
+  "description": "Smart personal finance manager with automated real-time custom budget constraint tracking, visual expense distribution indicators, and security-conscious Gemini AI categorization and spending coaching.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
