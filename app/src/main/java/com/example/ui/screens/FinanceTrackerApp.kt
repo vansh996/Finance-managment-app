@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.Transaction
+import com.example.data.model.Investment
 import com.example.ui.viewmodel.CategoryBudgetStatus
 import com.example.ui.viewmodel.FinanceViewModel
 import java.text.NumberFormat
@@ -41,7 +42,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 enum class FinanceTab {
-    DASHBOARD, TRANSACTIONS, ADD, BUDGETS, COACH
+    DASHBOARD, TRANSACTIONS, ADD, INVESTMENTS, BUDGETS, COACH
 }
 
 fun getCategoryColor(category: String): Color {
@@ -76,6 +77,7 @@ fun FinanceTrackerApp(viewModel: FinanceViewModel) {
     
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
     val categoryBudgets by viewModel.categoryBudgets.collectAsStateWithLifecycle()
+    val investments by viewModel.investments.collectAsStateWithLifecycle()
     
     // Derived overall financial stats
     val totalIncome = transactions.filter { it.type == "INCOME" }.sumOf { it.amount }
@@ -147,53 +149,64 @@ fun FinanceTrackerApp(viewModel: FinanceViewModel) {
                     containerColor = Color(0xFFF3F3F7),
                     tonalElevation = 0.dp
                 ) {
-                NavigationBarItem(
-                    selected = activeTab == FinanceTab.DASHBOARD,
-                    onClick = { activeTab = FinanceTab.DASHBOARD },
-                    icon = { Icon(Icons.Default.Home, contentDescription = "Dashboard") },
-                    label = { Text("Dashboard", fontSize = 11.sp) },
-                    modifier = Modifier.testTag("nav_dashboard")
-                )
-                NavigationBarItem(
-                    selected = activeTab == FinanceTab.TRANSACTIONS,
-                    onClick = { activeTab = FinanceTab.TRANSACTIONS },
-                    icon = { Icon(Icons.Default.List, contentDescription = "Transactions") },
-                    label = { Text("Ledger", fontSize = 11.sp) },
-                    modifier = Modifier.testTag("nav_transactions")
-                )
-                NavigationBarItem(
-                    selected = activeTab == FinanceTab.ADD,
-                    onClick = { activeTab = FinanceTab.ADD },
-                    icon = { Icon(Icons.Default.Add, contentDescription = "Add Transaction") },
-                    label = { Text("Log Tx", fontSize = 11.sp) },
-                    modifier = Modifier.testTag("nav_add")
-                )
-                NavigationBarItem(
-                    selected = activeTab == FinanceTab.BUDGETS,
-                    onClick = { activeTab = FinanceTab.BUDGETS },
-                    icon = { Icon(Icons.Default.Edit, contentDescription = "Budgets") },
-                    label = { Text("Limits", fontSize = 11.sp) },
-                    modifier = Modifier.testTag("nav_budgets")
-                )
-                NavigationBarItem(
-                    selected = activeTab == FinanceTab.COACH,
-                    onClick = { activeTab = FinanceTab.COACH },
-                    icon = { Icon(Icons.Default.Info, contentDescription = "Insights") },
-                    label = { Text("AI Coach", fontSize = 11.sp) },
-                    modifier = Modifier.testTag("nav_coach")
-                )
+                    NavigationBarItem(
+                        selected = activeTab == FinanceTab.DASHBOARD,
+                        onClick = { activeTab = FinanceTab.DASHBOARD },
+                        icon = { Icon(Icons.Default.Home, contentDescription = "Dashboard") },
+                        label = { Text("Dashboard", fontSize = 10.sp) },
+                        modifier = Modifier.testTag("nav_dashboard")
+                    )
+                    NavigationBarItem(
+                        selected = activeTab == FinanceTab.TRANSACTIONS,
+                        onClick = { activeTab = FinanceTab.TRANSACTIONS },
+                        icon = { Icon(Icons.Default.List, contentDescription = "Transactions") },
+                        label = { Text("Ledger", fontSize = 10.sp) },
+                        modifier = Modifier.testTag("nav_transactions")
+                    )
+                    NavigationBarItem(
+                        selected = activeTab == FinanceTab.ADD,
+                        onClick = { activeTab = FinanceTab.ADD },
+                        icon = { Icon(Icons.Default.Add, contentDescription = "Add Transaction") },
+                        label = { Text("Log Tx", fontSize = 10.sp) },
+                        modifier = Modifier.testTag("nav_add")
+                    )
+                    NavigationBarItem(
+                        selected = activeTab == FinanceTab.INVESTMENTS,
+                        onClick = { activeTab = FinanceTab.INVESTMENTS },
+                        icon = { Icon(Icons.Default.Star, contentDescription = "Investments") },
+                        label = { Text("Invest", fontSize = 10.sp) },
+                        modifier = Modifier.testTag("nav_investments")
+                    )
+                    NavigationBarItem(
+                        selected = activeTab == FinanceTab.BUDGETS,
+                        onClick = { activeTab = FinanceTab.BUDGETS },
+                        icon = { Icon(Icons.Default.Edit, contentDescription = "Budgets") },
+                        label = { Text("Limits", fontSize = 10.sp) },
+                        modifier = Modifier.testTag("nav_budgets")
+                    )
+                    NavigationBarItem(
+                        selected = activeTab == FinanceTab.COACH,
+                        onClick = { activeTab = FinanceTab.COACH },
+                        icon = { Icon(Icons.Default.Info, contentDescription = "Insights") },
+                        label = { Text("AI Coach", fontSize = 10.sp) },
+                        modifier = Modifier.testTag("nav_coach")
+                    )
+                }
             }
         }
-    }
-) { innerPadding ->
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // Summary Card (Balance, income, expenses) at top
-            SummaryHeaderCard(balance, totalIncome, totalExpense)
+            // Conditionally show header card based on whether we are viewing investments or checkings/wallets
+            if (activeTab == FinanceTab.INVESTMENTS) {
+                PortfolioHeaderCard(investments)
+            } else {
+                SummaryHeaderCard(balance, totalIncome, totalExpense)
+            }
             
             Spacer(modifier = Modifier.height(12.dp))
             
@@ -216,6 +229,7 @@ fun FinanceTrackerApp(viewModel: FinanceViewModel) {
                             },
                             viewModel = viewModel
                         )
+                        FinanceTab.INVESTMENTS -> InvestmentsScreen(viewModel)
                         FinanceTab.BUDGETS -> BudgetsScreen(categoryBudgets, onSaveLimit = { cat, limit ->
                             viewModel.updateBudgetLimit(cat, limit)
                         })
@@ -1175,6 +1189,534 @@ fun AICoachScreen(viewModel: FinanceViewModel) {
                         fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PortfolioHeaderCard(investments: List<Investment>) {
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale.US) }
+    
+    val totalCost = investments.sumOf { it.purchasePrice * it.quantity }
+    val totalValue = investments.sumOf { it.currentPrice * it.quantity }
+    val gainLoss = totalValue - totalCost
+    val gainPercent = if (totalCost > 0) (gainLoss / totalCost) * 100.0 else 0.0
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFEADDFF)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column {
+                    Text(
+                        text = "Portfolio Valuation",
+                        fontSize = 12.sp,
+                        color = Color(0xFF21005D),
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
+                    )
+                    Text(
+                        text = currencyFormat.format(totalValue),
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF21005D),
+                        letterSpacing = (-0.5).sp,
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+                }
+                
+                val badgeColor = if (gainLoss >= 0) Color(0xFF006E1C) else Color(0xFFBA1A1A)
+                val badgeText = if (gainLoss >= 0) "+${"%.2f".format(gainPercent)}%" else "${"%.2f".format(gainPercent)}%"
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.White.copy(alpha = 0.6f))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        badgeText,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = badgeColor
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(14.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = 0.5f))
+                        .padding(10.dp)
+                ) {
+                    Text(
+                        "COST BASIS", 
+                        fontSize = 8.sp, 
+                        fontWeight = FontWeight.Bold, 
+                        color = Color(0xFF21005D).copy(alpha = 0.7f),
+                        letterSpacing = 0.5.sp
+                    )
+                    Text(
+                        currencyFormat.format(totalCost), 
+                        fontSize = 14.sp, 
+                        fontWeight = FontWeight.Bold, 
+                        color = Color(0xFF21005D)
+                    )
+                }
+                
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = 0.5f))
+                        .padding(10.dp)
+                ) {
+                    Text(
+                        "TOTAL RETURNS", 
+                        fontSize = 8.sp, 
+                        fontWeight = FontWeight.Bold, 
+                        color = Color(0xFF21005D).copy(alpha = 0.7f),
+                        letterSpacing = 0.5.sp
+                    )
+                    Text(
+                        (if (gainLoss >= 0) "+" else "") + currencyFormat.format(gainLoss), 
+                        fontSize = 14.sp, 
+                        fontWeight = FontWeight.Bold, 
+                        color = if (gainLoss >= 0) Color(0xFF006E1C) else Color(0xFFBA1A1A)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun InvestmentsScreen(viewModel: FinanceViewModel) {
+    val investments by viewModel.investments.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshingPrices.collectAsStateWithLifecycle()
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale.US) }
+    
+    var name by remember { mutableStateOf("") }
+    var quantity by remember { mutableStateOf("") }
+    var buyPrice by remember { mutableStateOf("") }
+    var type by remember { mutableStateOf("STOCK") }
+    
+    val types = listOf("STOCK", "CRYPTO", "BOND", "MUTUAL_FUND", "OTHER")
+    val focusManager = LocalFocusManager.current
+    
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(bottom = 24.dp)
+    ) {
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, Color(0xFFC7C6CA), RoundedCornerShape(16.dp))
+                    .testTag("add_investment_card"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Log Asset Purchase",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = Color(0xFF1B1B1F)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(Color(0xFFF3F3F7))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "NEW ENTRY",
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF44464F)
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(10.dp))
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            label = { Text("Ticker (e.g. AAPL, BTC)", fontSize = 11.sp) },
+                            singleLine = true,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("investment_name_input"),
+                            textStyle = MaterialTheme.typography.bodyMedium
+                        )
+                        
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                "Asset Type", 
+                                fontSize = 10.sp, 
+                                fontWeight = FontWeight.Bold, 
+                                color = Color(0xFF44464F).copy(alpha = 0.8f),
+                                modifier = Modifier.padding(start = 2.dp, bottom = 2.dp)
+                            )
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                types.forEach { currType ->
+                                    val isSelected = type == currType
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (isSelected) Color(0xFF6750A4) else Color(0xFFF3F3F7))
+                                            .clickable { type = currType }
+                                            .border(
+                                                1.dp, 
+                                                if (isSelected) Color(0xFF6750A4) else Color(0xFFE1E2EC), 
+                                                RoundedCornerShape(8.dp)
+                                            )
+                                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = currType,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) Color.White else Color(0xFF44464F)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(10.dp))
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = quantity,
+                            onValueChange = { quantity = it },
+                            label = { Text("Quantity", fontSize = 11.sp) },
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Decimal,
+                                imeAction = ImeAction.Next
+                            ),
+                            singleLine = true,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("investment_quantity_input"),
+                            textStyle = MaterialTheme.typography.bodyMedium
+                        )
+                        
+                        OutlinedTextField(
+                            value = buyPrice,
+                            onValueChange = { buyPrice = it },
+                            label = { Text("Paid Price ($)", fontSize = 11.sp) },
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Decimal,
+                                imeAction = ImeAction.Done
+                            ),
+                            singleLine = true,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("investment_price_input"),
+                            textStyle = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    Button(
+                        onClick = {
+                            val qty = quantity.toDoubleOrNull() ?: 0.0
+                            val prc = buyPrice.toDoubleOrNull() ?: 0.0
+                            if (name.isNotBlank() && qty > 0.0 && prc > 0.0) {
+                                viewModel.insertInvestment(name, type, prc, qty)
+                                name = ""
+                                quantity = ""
+                                buyPrice = ""
+                                focusManager.clearFocus()
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .testTag("submit_investment_button"),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6750A4))
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Add", modifier = Modifier.size(16.dp))
+                            Text("Incorporate Asset", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+        
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Current Holdings",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = Color(0xFF1B1B1F)
+                    )
+                    Text(
+                        text = "Updated with Intelligent Pricing",
+                        fontSize = 10.sp,
+                        color = Color(0xFF44464F)
+                    )
+                }
+                
+                Button(
+                    onClick = { viewModel.refreshInvestmentPrices() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEADDFF)),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    enabled = !isRefreshing && investments.isNotEmpty(),
+                    modifier = Modifier.testTag("refresh_prices_button")
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (isRefreshing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(12.dp),
+                                strokeWidth = 1.5.dp,
+                                color = Color(0xFF21005D)
+                            )
+                        } else {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh", modifier = Modifier.size(14.dp), tint = Color(0xFF21005D))
+                        }
+                        Text("Sync Prices", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF21005D))
+                    }
+                }
+            }
+            if (isRefreshing) {
+                Spacer(modifier = Modifier.height(4.dp))
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .clip(RoundedCornerShape(1.dp)),
+                    color = Color(0xFF6750A4)
+                )
+            }
+        }
+        
+        if (investments.isEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp)
+                        .border(1.dp, Color(0xFFE1E2EC), RoundedCornerShape(16.dp)),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "No investments",
+                            tint = Color(0xFF44464F).copy(alpha = 0.5f),
+                            modifier = Modifier.size(36.dp)
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "No assets being tracked yet.",
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 13.sp,
+                            color = Color(0xFF1B1B1F)
+                        )
+                        Text(
+                            text = "Enter a premium stock, cryptocurrency, or bond symbol above to track costs & live return percentages.",
+                            fontSize = 11.sp,
+                            color = Color(0xFF44464F),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
+                }
+            }
+        } else {
+            items(investments, key = { holding -> holding.id }) { holding ->
+                val cost = holding.purchasePrice * holding.quantity
+                val currentVal = holding.currentPrice * holding.quantity
+                val profitLoss = currentVal - cost
+                val profitPercent = if (cost > 0.0) (profitLoss / cost) * 100.0 else 0.0
+                
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, Color(0xFFC7C6CA), RoundedCornerShape(16.dp))
+                        .testTag("investment_item_${holding.id}"),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFF3F3F7)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val assetIcon = when(holding.type) {
+                                "STOCK" -> Icons.Default.Star
+                                "CRYPTO" -> Icons.Default.Favorite
+                                "BOND" -> Icons.Default.Home
+                                else -> Icons.Default.Info
+                            }
+                            Icon(
+                                imageVector = assetIcon,
+                                contentDescription = holding.type,
+                                tint = Color(0xFF44464F),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.width(10.dp))
+                        
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    holding.name,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF1B1B1F)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Color(0xFFEADDFF))
+                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                ) {
+                                    Text(
+                                        holding.type,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF21005D)
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "Units: ${holding.quantity} • Cost: ${currencyFormat.format(holding.purchasePrice)}",
+                                fontSize = 11.sp,
+                                color = Color(0xFF44464F)
+                            )
+                            Text(
+                                text = "Market Price: ${currencyFormat.format(holding.currentPrice)}",
+                                fontSize = 10.sp,
+                                color = Color(0xFF44464F).copy(alpha = 0.7f)
+                            )
+                        }
+                        
+                        Column(
+                            horizontalAlignment = Alignment.End,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = currencyFormat.format(currentVal),
+                                fontSize = 14.sp,
+                                fontStyle = androidx.compose.ui.text.font.FontStyle.Normal,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1B1B1F)
+                            )
+                            
+                            val statusColor = if (profitLoss >= 0.0) Color(0xFF006E1C) else Color(0xFFBA1A1A)
+                            val profitSign = if (profitLoss >= 0.0) "+" else ""
+                            
+                            Text(
+                                text = "$profitSign${currencyFormat.format(profitLoss)} (${"%.1f".format(profitPercent)}%)",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = statusColor
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.width(4.dp))
+                        
+                        IconButton(
+                            onClick = { viewModel.deleteInvestment(holding) },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete holding",
+                                tint = Color(0xFFBA1A1A).copy(alpha = 0.8f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
                 }
             }
         }

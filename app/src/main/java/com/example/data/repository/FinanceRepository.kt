@@ -3,12 +3,14 @@ package com.example.data.repository
 import com.example.data.db.FinanceDao
 import com.example.data.model.Transaction
 import com.example.data.model.Budget
+import com.example.data.model.Investment
 import kotlinx.coroutines.flow.Flow
 
 class FinanceRepository(private val financeDao: FinanceDao) {
 
     val allTransactions: Flow<List<Transaction>> = financeDao.getAllTransactions()
     val allBudgets: Flow<List<Budget>> = financeDao.getAllBudgets()
+    val allInvestments: Flow<List<Investment>> = financeDao.getAllInvestments()
 
     suspend fun insertTransaction(transaction: Transaction) {
         financeDao.insertTransaction(transaction)
@@ -41,4 +43,25 @@ class FinanceRepository(private val financeDao: FinanceDao) {
     suspend fun deleteBudget(budget: Budget) {
         financeDao.deleteBudget(budget)
     }
+
+    suspend fun insertInvestment(investment: Investment) {
+        financeDao.insertInvestment(investment)
+    }
+
+    suspend fun insertInvestments(investments: List<Investment>) {
+        financeDao.insertInvestments(investments)
+    }
+
+    suspend fun updateInvestment(investment: Investment) {
+        financeDao.updateInvestment(investment)
+    }
+
+    suspend fun deleteInvestment(investment: Investment) {
+        financeDao.deleteInvestment(investment)
+    }
+
+    suspend fun deleteInvestmentById(id: Int) {
+        financeDao.deleteInvestmentById(id)
+    }
 }
+

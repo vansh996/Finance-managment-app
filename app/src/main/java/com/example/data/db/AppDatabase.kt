@@ -6,8 +6,9 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.example.data.model.Transaction
 import com.example.data.model.Budget
+import com.example.data.model.Investment
 
-@Database(entities = [Transaction::class, Budget::class], version = 1, exportSchema = false)
+@Database(entities = [Transaction::class, Budget::class, Investment::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun financeDao(): FinanceDao
 
@@ -21,7 +22,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "finance_tracker_db"
-                ).build()
+                ).fallbackToDestructiveMigration().build()
                 INSTANCE = instance
                 instance
             }

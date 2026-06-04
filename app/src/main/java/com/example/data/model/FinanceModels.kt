@@ -19,3 +19,15 @@ data class Budget(
     @PrimaryKey val category: String,
     val monthlyLimit: Double
 )
+
+@Entity(tableName = "investments")
+data class Investment(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val name: String,         // e.g. "AAPL", "BTC", "GOOG"
+    val type: String,         // "STOCK", "CRYPTO", "BOND", "MUTUAL_FUND", "OTHER"
+    val purchasePrice: Double,
+    val quantity: Double,
+    val currentPrice: Double,  // Local or API-fetched current estimate
+    val lastUpdated: Long = System.currentTimeMillis()
+)
+

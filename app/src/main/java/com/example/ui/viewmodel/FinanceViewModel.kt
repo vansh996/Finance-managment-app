@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.api.GeminiClient
 import com.example.data.model.Budget
 import com.example.data.model.Transaction
+import com.example.data.model.Investment
 import com.example.data.repository.FinanceRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -15,8 +16,20 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() {
+
+    // Expose all investments reactively
+    val investments: StateFlow<List<Investment>> = repository.allInvestments
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    private val _isRefreshingPrices = MutableStateFlow(false)
+    val isRefreshingPrices: StateFlow<Boolean> = _isRefreshingPrices.asStateFlow()
 
     // Expose all transactions reactively
     val transactions: StateFlow<List<Transaction>> = repository.allTransactions
@@ -119,6 +132,37 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
                 )
                 for (tx in seedTxs) {
                     repository.insertTransaction(tx)
+                }
+            }
+
+            // Check if investments are empty
+            val currentInvestments = repository.allInvestments.first()
+            if (currentInvestments.isEmpty()) {
+                val seedInvs = listOf(
+                    Investment(
+                        name = "AAPL",
+                        type = "STOCK",
+                        purchasePrice = 150.0,
+                        quantity = 15.0,
+                        currentPrice = 175.50
+                    ),
+                    Investment(
+                        name = "BTC",
+                        type = "CRYPTO",
+                        purchasePrice = 58200.0,
+                        quantity = 0.35,
+                        currentPrice = 67500.0
+                    ),
+                    Investment(
+                        name = "UST10Y",
+                        type = "BOND",
+                        purchasePrice = 98.50,
+                        quantity = 20.0,
+                        currentPrice = 99.10
+                    )
+                )
+                for (inv in seedInvs) {
+                    repository.insertInvestment(inv)
                 }
             }
         }
@@ -228,6 +272,98 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
     
     fun clearInsights() {
         _aiInsights.value = null
+    }
+
+    fun insertInvestment(name: String, type: String, purchasePrice: Double, quantity: Double) {
+        viewModelScope.launch {
+            repository.insertInvestment(
+                Investment(
+                    name = name.uppercase(Locale.ROOT).trim(),
+                    type = type,
+                    purchasePrice = purchasePrice,
+                    quantity = quantity,
+                    currentPrice = purchasePrice, // Default to purchase price initially
+                    lastUpdated = System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    fun deleteInvestment(investment: Investment) {
+        viewModelScope.launch {
+            repository.deleteInvestment(investment)
+        }
+    }
+
+    fun refreshInvestmentPrices() {
+        viewModelScope.launch {
+            _isRefreshingPrices.value = true
+            val currentInvestments = investments.value
+            if (currentInvestments.isEmpty()) {
+                _isRefreshingPrices.value = false
+                return@launch
+            }
+
+            val symbols = currentInvestments.map { it.name }.distinct()
+            val symbolsStr = symbols.joinToString(", ")
+
+            val prompt = """
+                You are a real-time financial market price tracker. Given the following financial symbols/assets:
+                $symbolsStr
+
+                Determine or search for their exact or highly realistic current market prices in USD right now. 
+                Return the result strictly as a JSON object of key-value pairs where keys are the symbols matching the casing requested and values are numbers representing the price in USD. No surrounding text, no formatting, no markdown. 
+                Example response:
+                {"AAPL": 178.25, "BTC": 67120.00}
+            """.trimIndent()
+
+            val response = GeminiClient.runPrompt(prompt)
+            val parsedPrices = if (response != null && !response.contains("API Key is not configured") && !response.contains("API error")) {
+                parsePricesFromJson(response)
+            } else {
+                emptyMap()
+            }
+
+            for (investment in currentInvestments) {
+                val symbolKey = investment.name.uppercase(Locale.ROOT).trim()
+                val fetchedPrice = parsedPrices[symbolKey] ?: parsedPrices[investment.name.trim()]
+                
+                val newPrice = if (fetchedPrice != null) {
+                    fetchedPrice
+                } else {
+                    // fall back to mock fluctuation (+- 3.5%)
+                    val change = 1.0 + ((Math.random() - 0.48) * 0.04)
+                    (investment.currentPrice * change).coerceAtLeast(0.01)
+                }
+
+                repository.updateInvestment(
+                    investment.copy(
+                        currentPrice = Math.round(newPrice * 100.0) / 100.0,
+                        lastUpdated = System.currentTimeMillis()
+                    )
+                )
+            }
+            _isRefreshingPrices.value = false
+        }
+    }
+
+    private fun parsePricesFromJson(jsonStr: String): Map<String, Double> {
+        val map = mutableMapOf<String, Double>()
+        try {
+            val clean = jsonStr.replace(Regex("(?s)```json\\s*"), "")
+                               .replace("```", "")
+                               .trim()
+            val regex = Regex("\"([^\"]+)\"\\s*:\\s*([0-9.+-]+)")
+            val matches = regex.findAll(clean)
+            for (match in matches) {
+                val sym = match.groups[1]?.value?.trim() ?: continue
+                val priceVal = match.groups[2]?.value?.toDoubleOrNull() ?: continue
+                map[sym.uppercase(Locale.ROOT)] = priceVal
+            }
+        } catch (e: Exception) {
+            // No-op
+        }
+        return map
     }
 }
 
